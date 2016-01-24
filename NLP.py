@@ -3,7 +3,7 @@ import re, nltk
 # flags=re.IGNORECASE
 remind_patterns = [r'\b(remind|tell|send)\s+me', # "Remind me"
 					r'\blet\s+me\s+know\b'] # "Let me know"
-sendlater_patterns = [r'\b(remind|tell|email|send)\s+[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', # "Remind x@y.z"
+sendlater_patterns = [r'\b(?:remind|tell|email|send)\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})', # "Remind x@y.z"
 						r'\b(?:email|send)\b(?:(?!to).)*to\s+\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})'] # "Send a message to x@y.z"
 
 def parseQuery(q):

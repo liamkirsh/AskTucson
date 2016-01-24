@@ -1,7 +1,7 @@
 import re, nltk, calendar
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 
-DEBUG = True
+DEBUG = False
 
 # flags=re.IGNORECASE
 remind_patterns = [r'\b(remind|tell|send)\s+me', # "Remind me"
@@ -13,13 +13,10 @@ day_patterns = [r'(\bnext\s)?((?:Sun|Mon|Tues|Wednes|Thurs|Fri|Satur)day)\b', # 
 				r'\btomorrow\b',
 				r'(?:in a |next )(week|month|year)']
 
-date_patterns = [r'\b(?:(Jan)\.?(?:uary)?|(Feb)\.?(?:ruary)?|(Mar)\.?(?:ch)?|(Apr)\.?(?:il)?|\
-(May)|(Jun)\.?(?:e)?|(Jul)\.?(?:y)?|(Aug)\.?(?:ust)?|\
-(Sep)\.?t?\.?(?:ember)?|(Oct)\.?(?:ober)?|(Nov)\.?(?:ember)?|(Dec)\.?(?:ember)?)\
- (\d+)(?:st|nd|rd|th)?(?:,? (\d+))?', # this has a ton of empty groups that need to be ignored.
+date_patterns = [r'\b(?:(Jan)\.?(?:uary)?|(Feb)\.?(?:ruary)?|(Mar)\.?(?:ch)?|(Apr)\.?(?:il)?|(May)|(Jun)\.?(?:e)?|(Jul)\.?(?:y)?|(Aug)\.?(?:ust)?|(Sep)\.?t?\.?(?:ember)?|(Oct)\.?(?:ober)?|(Nov)\.?(?:ember)?|(Dec)\.?(?:ember)?) (\d+)(?:st|nd|rd|th)?(?:,? (\d+))?', # this has a ton of empty groups that need to be ignored.
 				r'(\b\d+\/\d+(?:\/\d+)?)\b'] # 1/16/16 or 01/16/16, 01/16/2016, 2/24, etc.
  
-days = {'sunday':0, 'monday':1, 'tuesday':2, 'wednesday':3, 'thursday':4, 'friday':5, 'saturday':6}
+days = {'sunday':6, 'monday':0, 'tuesday':1, 'wednesday':2, 'thursday':3, 'friday':4, 'saturday':5}
 months = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
 
 # Solution by phihag <http://stackoverflow.com/users/35070/phihag>. Used under a CC-By-SA 3.0 license.
@@ -28,7 +25,7 @@ def next_weekday(d, weekday):
 	days_ahead = weekday - d.weekday()
 	if days_ahead <= 0: # Target day already happened this week
 		days_ahead += 7
-	return d + datetime.timedelta(days_ahead)
+	return d + timedelta(days_ahead)
 
 # Solution by Dave Webb <http://stackoverflow.com/users/3171/dave-webb>. Used under a CC-By-SA 3.0 license.
 # http://stackoverflow.com/a/4131114
@@ -37,7 +34,7 @@ def add_months(sourcedate, months):
 	year = int(sourcedate.year + month / 12 )
 	month = month % 12 + 1
 	day = min(sourcedate.day, calendar.monthrange(year, month)[1])
-	return datetime.date(year, month, day)
+	return date(year, month, day)
 	
 # Solution by Gareth Rees <http://stackoverflow.com/users/68063/gareth-rees>. Used under a CC-By-SA 3.0 license.
 # http://stackoverflow.com/a/15743908
@@ -59,7 +56,7 @@ def parseQuery(query):
 	#parsed = nltk.word_tokenize(q)
 	#parts = nltk.pos_tag(parsed)
 
-	q = query.split(/\r?\n/)
+	q = query.split("/\r?\n/")[0]
 	# First check for reminder format
 	qType = -1 # 0 for reminder, 1 for sendlater
 	minNdx = float('inf')
@@ -80,13 +77,13 @@ def parseQuery(query):
 	# Figure out the date and time
 	# default: today at noon
 	d = date.today()
-	t = datetime.time(12, 00)
+	t = time(12, 00)
 	#dt = datetime.combine(d, t)
 	
 	# Look for a day pattern
 	match = re.search(day_patterns[0], q, re.IGNORECASE)
 	if match:
-		groups = [group for group in match.groups()[1:] if group] # don't include the first group -- full string
+		groups = [group for group in match.groups() if group]
 		# For next, use the next xday after the Sunday following today
 		if match.group(1): # next
 			# Find the following Sunday after today
@@ -98,12 +95,12 @@ def parseQuery(query):
 	else:
 		match = re.search(day_patterns[1], q, re.IGNORECASE)
 		if match: # tomorrow
-			d += datetime.timedelta(1) # add one day to today
+			d += timedelta(1) # add one day to today
 		else:
 			match = re.search(day_patterns[2], q, re.IGNORECASE)
 			if match: # in a week/month/year, next week/month/year
 				if match.group(1).lower() == "week":
-					d += datetime.timedelta(7)
+					d += timedelta(7)
 				elif match.group(1).lower() == "month":
 					d = add_months(d, 1)
 				elif match.group(1).lower() == "year":
@@ -132,25 +129,30 @@ def parse_date(today, q):
 	match = re.search(date_patterns[0], q)
 	if match:
 		# full date spelled out
-		groups = [group for group in match.groups()[1:] if group]
+		if DEBUG:
+			print 'full date spelled out'
+		groups = [group for group in match.groups()	 if group]
 		month = months[groups[0].lower()]
 		day = groups[1]
 		year = groups[2] if len(groups) > 2 else datetime.now().year
 		
-		return datetime.strptime("%s-%s-%s" % (month, day, year), "%Y-%m-%d")
+		return datetime.strptime("%s-%s-%s" % (month, day, year), "%m-%d-%Y")
 	else:
 		match = re.search(date_patterns[1], q)
 		if match:
-			spl = q.split(',')
+			dat = match.groups(1)[0] # not sure why this is a tuple here before indexing??
+			spl = dat.split('/')
 			# mm/dd or mm/dd/yy or mm/dd/yyyy format
 			if len(spl) == 2:
 				year = datetime.now().year
-				return datetime.strptime("%s/%s" % (q, year), "%m/%d/%Y")
+				return datetime.strptime("%s/%s" % (dat, year), "%m/%d/%Y")
 			else: #len == 3
 				yrLen = len(spl[2])
+				if DEBUG:
+					print spl
 				if yrLen == 2: # extend year to 4-digit format
-					q = "%s/%s/20%s" % spl
-				return datetime.strptime(q, "%m/%d/%Y")
+					dat = "%s/%s/20%s" % (spl[0], spl[1], spl[2])
+				return datetime.strptime(dat, "%m/%d/%Y")
 	
 while True:		
 	query = raw_input()

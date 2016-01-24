@@ -15,6 +15,13 @@ day_patterns = [r'(\bnext\s)?((?:Sun|Mon|Tues|Wednes|Thurs|Fri|Satur)day)\b', # 
 
 date_patterns = [r'\b(?:(Jan)\.?(?:uary)?|(Feb)\.?(?:ruary)?|(Mar)\.?(?:ch)?|(Apr)\.?(?:il)?|(May)|(Jun)\.?(?:e)?|(Jul)\.?(?:y)?|(Aug)\.?(?:ust)?|(Sep)\.?t?\.?(?:ember)?|(Oct)\.?(?:ober)?|(Nov)\.?(?:ember)?|(Dec)\.?(?:ember)?) (\d+)(?:st|nd|rd|th)?(?:,? (\d+))?', # this has a ton of empty groups that need to be ignored.
 				r'(\b\d+\/\d+(?:\/\d+)?)\b'] # 1/16/16 or 01/16/16, 01/16/2016, 2/24, etc.
+				
+# Note placement of 'midnight' before 'night' to avoid conflicts
+gen_times = [('tonight', 21), ('morning', 9), ('noon', 12), ('afternoon', 15), ('evening', 18), ('midnight', 0), ('night', 21)]
+
+spec_times = [r'\bat\s(half past\s|a quarter past\s)?(\d)+(?::(\d+))?\s?(am|pm)?', r'\b(half past\s|a quarter past\s)?(\d)+(?::(\d+))?\s?(am|pm)?'] # try without the 'at' if it's not found initially
+
+period = r'in an? (minute|hour)'
  
 days = {'sunday':6, 'monday':0, 'tuesday':1, 'wednesday':2, 'thursday':3, 'friday':4, 'saturday':5}
 months = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
@@ -111,9 +118,53 @@ def parseQuery(query):
 			else:
 				# day patterns did not work. Look for a specific date.
 				d = parse_date(d, q)
-			
+	
+	# Now, let's figure out the time
+	tSet = False
+	for tm in gen_times:
+		if tm[0] in q.lower():
+			t = time(tm[1], 00)
+			tSet = True
+			break
+	
+	if not tSet:
+		for tm in spec_times:
+			match = re.search(tm, q, re.IGNORECASE)
+			if match:
+				if match.group(0) == "half past":
+					mins = 30
+				elif match.group(0) == "a quarter past":
+					mins = 15
+				else:
+					mins = int(match.group(3)) if match.group(3) else 00
+				
+				hrs = int(match.group(2))
+				if match.group(4).lower() == "pm":
+					hrs += 12
+				t = time(hrs, mins)
+				tSet = True
+				break
+	
+	if not tSet: #still no? try checking for 'in a minute' or 'in an hour'
+		match = re.search(period, q, re.IGNORECASE)
+		if DEBUG:
+			print 'checking for in a minute/hour'
+		if match:
+			if DEBUG:
+				print 'matched!'
+			now = datetime.now()
+			if match.group(1) == "minute":
+				t = (now + timedelta(minutes = 1)).time()
+			elif match.group(1) == "hour":
+				t = (now + timedelta(hours = 1)).time()
+				
+			if t.hour == 0: # it's the dawn of a new day
+				d += timedelta(1)
+		
+	
 	print "Date:", str(d)
-
+	print "Time:", str(t)
+	
 	if qType == 0:
 		print 'reminder'
 	elif qType == 1 and email:
@@ -131,7 +182,7 @@ def parse_date(today, q):
 		# full date spelled out
 		if DEBUG:
 			print 'full date spelled out'
-		groups = [group for group in match.groups()	 if group]
+		groups = [group for group in match.groups() if group]
 		month = months[groups[0].lower()]
 		day = groups[1]
 		year = groups[2] if len(groups) > 2 else datetime.now().year
@@ -140,7 +191,7 @@ def parse_date(today, q):
 	else:
 		match = re.search(date_patterns[1], q)
 		if match:
-			dat = match.groups(1)[0] # not sure why this is a tuple here before indexing??
+			dat = match.group(1)
 			spl = dat.split('/')
 			# mm/dd or mm/dd/yy or mm/dd/yyyy format
 			if len(spl) == 2:
@@ -153,6 +204,7 @@ def parse_date(today, q):
 				if yrLen == 2: # extend year to 4-digit format
 					dat = "%s/%s/20%s" % (spl[0], spl[1], spl[2])
 				return datetime.strptime(dat, "%m/%d/%Y")
+		else: return today
 	
 while True:		
 	query = raw_input()

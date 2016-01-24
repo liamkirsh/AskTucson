@@ -9,12 +9,13 @@ sendlater_patterns = [r'\b(?:remind|tell|email|send)\s+([A-Za-z0-9._%+-]+@[A-Za-
 def parseQuery(q):
 	#email = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', q)
 	#q = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', 'Userxx', q) # Replace email address with 'User"
-	parsed = nltk.word_tokenize(q)
-	parts = nltk.pos_tag(parsed)
+	#parsed = nltk.word_tokenize(q)
+	#parts = nltk.pos_tag(parsed)
 
 	# First check for reminder format
 	qType = -1 # 0 for reminder, 1 for sendlater
 	minNdx = float('inf')
+	recipient = None
 	for pat in remind_patterns:
 		match = re.search(pat, q)
 		if match and match.start() < minNdx:
@@ -26,11 +27,13 @@ def parseQuery(q):
 		if match and match.start() < minNdx:
 			qType = 1
 			minRemindNdx = match.start()
+			email = match.group(1)
 
 	if qType == 0:
 		print 'reminder'
-	elif qType == 1:
+	elif qType == 1 and email:
 		print 'sendlater'
+		print 'email: %s' % email
 	else:
 		print 'err'
 	

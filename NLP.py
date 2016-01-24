@@ -1,4 +1,5 @@
 import re, nltk
+from datetime import datetime, date, time
 
 # flags=re.IGNORECASE
 remind_patterns = [r'\b(remind|tell|send)\s+me', # "Remind me"
@@ -28,6 +29,13 @@ def parseQuery(q):
 			qType = 1
 			minRemindNdx = match.start()
 			email = match.group(1)
+			
+	# Figure out the date and time
+	d = date.today()
+	t = datetime.time(12, 00)
+	dt = datetime.combine(d, t)
+	
+	
 
 	if qType == 0:
 		print 'reminder'
